@@ -1,8 +1,8 @@
 <h1 align="center">Dimstorted</h1>
 
 <p align="center">
-  Ma collection de jeux rétro, rangée comme un catalogue de streaming.<br>
-  Quinze consoles, mille jeux, et rien qui sorte de la machine.
+  Un fichier de jeu ne dit pas de quelle console il vient.<br>
+  Dimstorted lit son en-tête binaire, le range, et le rend jouable.
 </p>
 
 <p align="center">
@@ -16,9 +16,11 @@
 
 ![L'accueil](docs/images/accueil.jpg)
 
-Le serveur écoute sur `127.0.0.1`. Pas de compte, pas de service tiers, pas de
-télémétrie. Le nom vient de *dimension tordue* — l'effet Lense-Thirring, quand
-une masse en rotation entraîne l'espace-temps avec elle.
+Quinze consoles, une collection personnelle rangée comme un catalogue de
+streaming — et rien qui sorte de la machine. Le serveur écoute sur `127.0.0.1` :
+pas de compte, pas de service tiers, pas de télémétrie. Le nom vient de
+*dimension tordue* — l'effet Lense-Thirring, quand une masse en rotation
+entraîne l'espace-temps avec elle.
 
 ---
 
