@@ -1,0 +1,24 @@
+# Dependances
+node_modules/
+
+# Donnees locales : base, jaquettes, sauvegardes de partie, captures.
+# Les visuels viennent de libretro-thumbnails et de LaunchBox : ils ne sont
+# pas a nous, et la base contient l'historique de jeu.
+data/
+
+# Configuration de la machine : chemins absolus et empreintes des emulateurs
+# enregistres. Voir config.example.json.
+config.json
+
+# Theme tiers — voir la section « Credits » du README.
+# Les 37 images viennent d'Alekfull-ARTFLIX, publie sans licence. On s'en sert
+# en local, on ne les redistribue pas. Sans elles l'interface se rabat sur les
+# noms de consoles et des aplats de couleur.
+public/theme/
+
+# Journaux et fichiers de travail
+*.log
+*.tgz
+
+# Reglages locaux de l'outillage
+.claude/settings.local.json

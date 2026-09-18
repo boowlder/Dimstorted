@@ -1,0 +1,14 @@
+{
+  "port": 1985,
+  "host": "127.0.0.1",
+  "gamesPath": "D:\\Dimstorted\\Games",
+  "importPath": "D:\\Dimstorted\\Import",
+  "biosPath": "D:\\Dimstorted\\BIOS",
+  "dataPath": "./data",
+  "emulatorSource": "cdn",
+  "autoScanInterval": 30,
+  "regionPreference": ["France", "Europe", "Monde", "USA", "Japon"],
+  "rejectDuplicates": true,
+  "emulatorPaths": {},
+  "activeProfile": 1
+}

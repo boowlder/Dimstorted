@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dimstorted</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%20%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%23141414%22/%3E%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%23e50914%22%20stroke-width%3D%221.6%22%3E%20%3Cellipse%20cx%3D%2216%22%20cy%3D%2216%22%20rx%3D%2211%22%20ry%3D%224.5%22%20transform%3D%22rotate%28-8%2016%2016%29%22/%3E%20%3Cellipse%20cx%3D%2216%22%20cy%3D%2216%22%20rx%3D%228.5%22%20ry%3D%223.6%22%20transform%3D%22rotate%2820%2016%2016%29%22%20opacity%3D%22.8%22/%3E%20%3Cellipse%20cx%3D%2216%22%20cy%3D%2216%22%20rx%3D%226%22%20ry%3D%222.6%22%20transform%3D%22rotate%2848%2016%2016%29%22%20opacity%3D%22.6%22/%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%222.6%22%20fill%3D%22%23e50914%22/%3E%20%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav id="nav">
+  <div class="nav-left">
+    <a class="logo" data-view="home">DIMSTORTED</a>
+    <a class="nav-link active" data-view="home">Accueil</a>
+    <a class="nav-link" data-view="consoles">Consoles</a>
+    <a class="nav-link" data-view="mylist">Ma liste</a>
+    <a class="nav-link" id="nav-controls">Commandes</a>
+    <a class="nav-link" id="nav-stats">Statistiques</a>
+    <a class="nav-link" id="nav-tv">Mode TV</a>
+  </div>
+  <div class="nav-right">
+    <div class="search">
+      <svg viewBox="0 0 24 24" class="icon"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
+      <input id="search-input" type="search" placeholder="Rechercher un jeu..." autocomplete="off">
+    </div>
+    <button id="btn-random" class="btn-random" title="Lance-moi un jeu au hasard">🎲</button>
+    <button id="btn-import" class="btn-import">+ Ajouter des jeux</button>
+    <div class="account" id="account">
+      <button class="avatar" id="avatar" aria-haspopup="menu" aria-expanded="false"></button>
+      <div class="account-menu" id="account-menu" role="menu" hidden></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ------------------------------------------------------------- Profils -->
+<div id="view-profiles" class="profiles-screen" hidden>
+  <div class="profiles-inner">
+    <h1 class="profiles-title">Qui joue&nbsp;?</h1>
+    <ul class="profiles-grid" id="profiles-grid"></ul>
+    <button class="profiles-manage" id="profiles-manage">Gérer les profils</button>
+    <button class="profiles-done" id="profiles-done" hidden>Terminé</button>
+  </div>
+</div>
+
+<!-- Création / modification d'un profil -->
+<div id="view-profile-edit" class="overlay" hidden>
+  <div class="fixer-panel panel-narrow">
+    <button class="close" id="profile-edit-close">✕</button>
+    <h2 id="profile-edit-title">Nouveau profil</h2>
+
+    <div class="profile-form">
+      <div class="profile-preview" id="profile-preview"></div>
+      <label class="edit-full">Nom
+        <input id="profile-name" type="text" maxlength="24" placeholder="Invité" autocomplete="off">
+      </label>
+      <div class="edit-full">
+        <span class="swatch-label">Couleur</span>
+        <div class="swatches" id="profile-colors"></div>
+      </div>
+    </div>
+
+    <div class="confirm-actions">
+      <button class="btn btn-play" id="profile-save">Enregistrer</button>
+      <button class="btn btn-ghost" id="profile-cancel">Annuler</button>
+      <button class="link-btn danger" id="profile-delete" hidden>Supprimer ce profil</button>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- Accueil -->
+<main id="view-home">
+  <section id="hero" class="hero" hidden>
+    <div class="hero-bg"></div>
+    <div class="hero-voile"></div>
+    <div class="hero-content">
+      <div class="hero-console"></div>
+      <h1 class="hero-title"></h1>
+      <p class="hero-meta"></p>
+      <p class="hero-desc" hidden></p>
+      <div class="hero-buttons">
+        <button class="btn btn-play"><svg class="bi" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Jouer</button>
+        <button class="btn btn-info"><svg class="bi" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>Plus d'infos</button>
+      </div>
+    </div>
+    <!-- La colonne de logos d'ARTFLIX : les autres jeux en vedette, montres
+         par leur lettrage. Cliquer change la vedette. -->
+    <div class="hero-pile"></div>
+  </section>
+
+  <div id="filters" class="filters" hidden>
+    <div class="filters-inner">
+      <select id="f-console" class="f-sel"></select>
+      <select id="f-genre" class="f-sel"></select>
+      <select id="f-year" class="f-sel"></select>
+      <select id="f-players" class="f-sel"></select>
+      <select id="f-sort" class="f-sel">
+        <option value="title">Titre A→Z</option>
+        <option value="added">Ajoutés récemment</option>
+        <option value="year">Année</option>
+        <option value="played">Temps de jeu</option>
+      </select>
+      <button class="link-btn" id="f-reset">Tout effacer</button>
+      <span class="f-count" id="f-count"></span>
+    </div>
+  </div>
+
+  <div id="rows"></div>
+
+  <section id="empty-state" class="empty" hidden>
+    <h2>Ta bibliothèque est vide</h2>
+    <p>Dépose des ROMs ou des ISO pour commencer. Dimstorted identifie la console tout seul.</p>
+    <button class="btn btn-play" id="empty-import">+ Ajouter des jeux</button>
+    <p class="empty-hint">Tu peux aussi déposer directement tes fichiers dans <code id="empty-path"></code></p>
+  </section>
+</main>
+
+<!-- -------------------------------------------------------------- Import -->
+<div id="view-import" class="overlay" hidden>
+  <div class="manage-panel">
+    <button class="close" data-close="import">✕</button>
+
+    <header class="manage-head">
+      <h2>Ma collection</h2>
+      <nav class="manage-tabs">
+        <button class="mtab on" data-tab="add">Ajouter</button>
+        <button class="mtab" data-tab="lib">Bibliothèque</button>
+        <button class="mtab" data-tab="emu">Émulateurs</button>
+      </nav>
+    </header>
+
+    <!-- ------------------------------------------------------- Ajouter -->
+    <section class="manage-body" data-panel="add">
+      <div id="dropzone" class="dropzone">
+        <div class="dropzone-inner">
+          <div class="dz-icon">↓</div>
+          <p class="dz-title">Glisse tes jeux ici</p>
+          <p class="dz-sub">ROMs, ISO, CHD, ZIP — la console est reconnue toute seule</p>
+          <button class="btn btn-play" id="btn-browse">Parcourir mes fichiers</button>
+          <input type="file" id="file-input" multiple hidden>
+        </div>
+        <div class="dz-progress" hidden><div class="dz-bar"></div><span class="dz-label"></span></div>
+      </div>
+
+      <p class="dz-alt">
+        Tu peux aussi les déposer directement dans <code id="import-path"></code>,
+        ou <button class="link-btn" id="btn-show-scan">analyser un dossier existant</button>.
+      </p>
+      <div class="scan-row" id="scan-row" hidden>
+        <input id="scan-path" type="text" placeholder="/mnt/d/Jeux">
+        <button class="btn btn-ghost" id="btn-scan">Analyser</button>
+      </div>
+
+      <div id="queue-block" hidden>
+        <div class="section-head">
+          <h3>À valider <span id="queue-count" class="pill">0</span></h3>
+          <div class="srow-act">
+            <button class="btn btn-play" id="btn-accept-all">Tout valider</button>
+            <button class="link-btn" id="btn-accept-confident">Seulement les certains</button>
+          </div>
+        </div>
+        <div id="queue"></div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------- Bibliothèque -->
+    <section class="manage-body" data-panel="lib" hidden>
+      <div class="srow">
+        <div class="srow-main">
+          <b>Jaquettes et descriptions</b>
+          <small id="scrape-info">—</small>
+          <div id="scrape-progress" hidden>
+            <div class="scrape-track"><div class="scrape-bar"></div></div>
+            <span class="scrape-label"></span>
+          </div>
+        </div>
+        <div class="srow-act">
+          <button class="btn btn-ghost" id="btn-scrape-missing">Compléter</button>
+          <button class="link-btn" id="btn-scrape-all">Tout refaire</button>
+        </div>
+      </div>
+
+      <div class="srow">
+        <div class="srow-main">
+          <b>Éditions régionales <span id="dup-count" class="pill">0</span></b>
+          <small>Quand un jeu existe en plusieurs versions, Dimstorted lance la première de cet ordre.</small>
+          <div class="region-chips" id="region-chips"></div>
+          <div id="duplicates"></div>
+        </div>
+        <div class="srow-act">
+          <button class="link-btn" id="btn-edit-regions">Modifier l’ordre</button>
+        </div>
+      </div>
+
+      <div class="srow">
+        <div class="srow-main">
+          <b>Sauvegarde de la bibliothèque</b>
+          <small id="backup-info">—</small>
+        </div>
+        <div class="srow-act">
+          <button class="btn btn-ghost" id="btn-backup">Sauvegarder</button>
+        </div>
+      </div>
+
+      <div class="srow" id="rejected-row" hidden>
+        <div class="srow-main" id="rejected"></div>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------- Émulateurs -->
+    <section class="manage-body" data-panel="emu" hidden>
+      <p class="manage-intro">
+        PS2, GameCube et Dreamcast se jouent sur le PC. Installe l’émulateur
+        depuis sa source officielle, puis indique-le ici : son empreinte est
+        relevée, et revérifiée avant chaque lancement.
+      </p>
+      <div id="emulators"></div>
+    </section>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- Fiche -->
+<div id="view-detail" class="overlay" hidden>
+  <div class="detail-panel">
+    <button class="close" data-close="detail">✕</button>
+    <div class="detail-art">
+      <div class="detail-art-bg"></div>
+      <div class="detail-voile"></div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-grid">
+        <div class="detail-poster" hidden></div>
+        <div class="detail-info">
+          <div class="detail-console"></div>
+          <h2 class="detail-title"></h2>
+          <div class="detail-actions">
+            <button class="btn btn-play detail-play"><svg class="bi" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span class="play-label">Jouer</span></button>
+            <button class="btn btn-info detail-restart" hidden>Recommencer</button>
+            <button class="btn btn-round detail-list" title="Ma liste">+</button>
+          </div>
+          <div class="detail-meta"></div>
+          <div class="detail-note etoiles" hidden></div>
+          <div class="detail-shots" hidden></div>
+          <div class="detail-saves" hidden></div>
+          <div class="detail-editions" hidden></div>
+          <p class="detail-credits" hidden></p>
+          <p class="detail-desc"></p>
+          <div class="detail-native" hidden></div>
+          <div class="detail-scrape"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- Commandes -->
+<div id="view-controls" class="overlay" hidden>
+  <div class="fixer-panel">
+    <button class="close" data-close="controls">✕</button>
+    <h2>Commandes</h2>
+    <p class="fixer-game">Un profil par console, valable sur tous ses jeux et depuis n'importe quel appareil.</p>
+
+    <div class="ctrl-consoles" id="ctrl-consoles"></div>
+    <div class="ctrl-hint" id="ctrl-hint"></div>
+
+    <div class="vid-row">
+      <div>
+        <b>Rendu de l’image</b>
+        <small id="vid-desc">—</small>
+      </div>
+      <select id="vid-shader" class="vid-select"></select>
+    </div>
+
+    <div class="vid-row">
+      <div>
+        <b>Couleur de l’interface</b>
+        <small>Teinte des boutons et du liseré. Réglage propre à cet appareil.</small>
+      </div>
+      <select id="teinte-select" class="vid-select">
+        <option value="rouge">Rouge</option>
+        <option value="bleu">Bleu</option>
+        <option value="vert">Vert</option>
+        <option value="orange">Orange</option>
+        <option value="violet">Violet</option>
+      </select>
+    </div>
+
+    <div class="vid-row">
+      <div>
+        <b>Effet cathodique de l’interface</b>
+        <small>Voile tout le site, pas seulement le jeu. Réglage propre à cet appareil.</small>
+      </div>
+      <select id="fx-select" class="vid-select">
+        <option value="aucun">Aucun</option>
+        <option value="scanlines">Lignes de balayage</option>
+        <option value="crt">Tube cathodique</option>
+        <option value="phosphore">Phosphore</option>
+      </select>
+    </div>
+
+    <div class="ctrl-grid" id="ctrl-grid"></div>
+
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="ctrl-reset">Réglages par défaut</button>
+      <button class="btn btn-play" id="ctrl-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------ Édition manuelle -->
+<div id="view-edit" class="overlay" hidden>
+  <div class="fixer-panel">
+    <button class="close" data-close="edit">✕</button>
+    <h2>Modifier la fiche</h2>
+    <p class="fixer-game edit-game"></p>
+
+    <div class="edit-grid">
+      <label>Titre<input id="edit-title" type="text"></label>
+      <label>Année<input id="edit-year" type="number" min="1970" max="2100" placeholder="2015"></label>
+      <label>Genre<input id="edit-genre" type="text" placeholder="Plateforme"></label>
+      <label>Joueurs<input id="edit-players" type="number" min="1" max="16" placeholder="1"></label>
+      <label>Développeur<input id="edit-developer" type="text" placeholder="Sonic Team Junior"></label>
+      <label>Éditeur<input id="edit-publisher" type="text" placeholder="Fangame"></label>
+    </div>
+    <label class="edit-full">Description
+      <textarea id="edit-description" rows="4" placeholder="De quoi parle ce jeu ?"></textarea>
+    </label>
+
+    <div class="edit-cover">
+      <span>Jaquette personnalisée</span>
+      <input type="file" id="edit-cover-file" accept="image/*" hidden>
+      <button class="btn btn-ghost" id="edit-cover-btn">Choisir une image…</button>
+      <small id="edit-cover-name"></small>
+    </div>
+
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="edit-cancel">Annuler</button>
+      <button class="btn btn-play" id="edit-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------- Correction jaquette -->
+<div id="view-fixer" class="overlay" hidden>
+  <div class="fixer-panel">
+    <button class="close" data-close="fixer">✕</button>
+    <h2>Chercher la bonne jaquette</h2>
+    <p class="fixer-game"></p>
+    <div class="scan-row">
+      <input id="fixer-input" type="text" placeholder="Titre à rechercher (souvent en anglais)">
+      <button class="btn btn-ghost" id="fixer-search">Chercher</button>
+    </div>
+    <div id="fixer-results"></div>
+  </div>
+</div>
+
+<!-- -------------------------------------------------------------- Lecteur -->
+<div id="view-player" class="player" hidden>
+  <div class="player-bar">
+    <span class="player-title"></span>
+    <div class="player-tools">
+      <span class="player-discs" id="player-discs" hidden></span>
+      <span class="player-hint">Échap pour quitter</span>
+      <button class="btn btn-ghost" id="btn-shot" title="Maj+S">Capturer</button>
+      <button class="btn btn-ghost" id="btn-save-slot" title="Ctrl+S">Sauvegarder</button>
+      <button class="btn btn-ghost" id="btn-quit">Quitter</button>
+    </div>
+  </div>
+  <iframe id="player-frame" title="Émulateur" allow="gamepad *; autoplay; fullscreen"></iframe>
+</div>
+
+<!-- ------------------------------------------------------- Palette Ctrl+K -->
+<div id="palette" class="palette" hidden>
+  <div class="palette-box">
+    <input id="palette-input" type="text" placeholder="Lancer un jeu…" autocomplete="off">
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------- Confirmation -->
+<div id="view-confirm" class="overlay" hidden>
+  <div class="confirm-panel">
+    <p class="confirm-text"></p>
+    <label class="confirm-check">
+      <input type="checkbox" id="confirm-delete-files">
+      Supprimer aussi les fichiers du disque (irréversible)
+    </label>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">Annuler</button>
+      <button class="btn btn-play" id="confirm-ok">Retirer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- Statistiques -->
+<div id="view-stats" class="overlay" hidden>
+  <div class="fixer-panel">
+    <button class="close" data-close="stats">✕</button>
+    <h2>Tes statistiques</h2>
+    <div id="stats-body"></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------- Barre d'aide (mode TV)
+     ARTFLIX garde en permanence, en pied d'ecran, le rappel de ce que fait
+     chaque bouton — on joue a trois metres, sans clavier ni souris. On ne
+     liste que des actions qui existent vraiment : une aide qui ment est pire
+     que pas d'aide du tout. -->
+<div id="aide-tv" class="aide-tv" hidden>
+  <span class="aide-item"><b class="glyphe gl-a">A</b>Choisir</span>
+  <span class="aide-item"><b class="glyphe gl-b">B</b>Retour</span>
+  <span class="aide-item"><b class="glyphe gl-x">X</b>Ma liste</span>
+  <span class="aide-item"><b class="glyphe gl-y">Y</b>Aléatoire</span>
+  <span class="aide-item"><b class="glyphe">☰</b>Consoles</span>
+  <span class="aide-item aide-dirs"><b class="glyphe">✛</b>Naviguer</span>
+  <span class="aide-heure" id="aide-heure"></span>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/js/app.js" type="module"></script>
+</body>
+</html>

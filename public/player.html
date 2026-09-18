@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecteur Dimstorted</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141414'/%3E%3Ctext x='16' y='24' font-family='Arial Black,Arial' font-size='22' font-weight='900' fill='%23e50914' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  #game { width: 100%; height: 100%; }
+  #msg { display: grid; place-items: center; height: 100%; text-align: center; padding: 24px; }
+  /* `#msg { display: grid }` l'emporte sur le display:none que le navigateur
+     applique a l'attribut hidden : sans cette regle, masquer le message
+     laisse l'ecran de chargement par-dessus le jeu. */
+  [hidden] { display: none !important; }
+  #msg h1 { font-size: 20px; margin: 0 0 10px; }
+  #msg p { color: #b3b3b3; max-width: 520px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="msg"><div><h1>Chargement…</h1><p>Préparation de l’émulateur.</p></div></div>
+<div id="game" hidden></div>
+
+<script>
+/*
+ * Page de lecture isolee.
+ *
+ * EmulatorJS s'initialise a partir de variables globales et ne se re-initialise
+ * pas proprement deux fois dans la meme page. L'isoler dans une iframe rendue
+ * a chaque lancement garantit un demarrage propre et une fermeture nette.
+ */
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const msg = document.getElementById('msg');
+
+  const fail = (title, detail) => {
+    msg.innerHTML = `<div><h1>${title}</h1><p>${detail}</p></div>`;
+    msg.hidden = false;
+  };
+
+  if (!id) return fail('Aucun jeu demandé', 'Le paramètre « id » est absent de l’URL.');
+
+  let game, emu;
+  try {
+    [game, emu] = await Promise.all([
+      fetch(`/api/games/${id}`).then((r) => r.json()),
+      fetch('/api/emulator-path').then((r) => r.json()),
+    ]);
+  } catch (err) {
+    return fail('Serveur injoignable', err.message);
+  }
+
+  /*
+   * Commandes : EmulatorJS les garde dans le localStorage, par jeu. On impose
+   * donc le profil de la console, defini une fois cote serveur et valable sur
+   * tous les jeux et tous les appareils.
+   *
+   * Attention : un objet incomplet fait planter l'emulateur (il attend les
+   * quatre joueurs). Le serveur normalise deja, et on ne pose la globale que
+   * si la structure recue est saine.
+   */
+  try {
+    const res = await fetch(`/api/controls/${encodeURIComponent(game.console)}`);
+    if (res.ok) {
+      const { profile } = await res.json();
+      if (profile && profile[0] && Object.keys(profile[0]).length) {
+        window.EJS_defaultControls = {
+          0: profile[0], 1: profile[1] || {}, 2: profile[2] || {}, 3: profile[3] || {},
+        };
+      }
+    }
+  } catch {
+    // Sans profil, EmulatorJS garde ses propres reglages : ce n'est pas bloquant
+  }
+
+  if (game.error) return fail('Jeu introuvable', game.error);
+
+  // Un fangame navigateur n'a besoin d'aucun emulateur : on charge sa page.
+  if (game.runtime === 'html5') {
+    msg.hidden = true;
+    const holder = document.getElementById('game');
+    holder.hidden = false;
+    const frame = document.createElement('iframe');
+    frame.src = `/play/${game.id}`;
+    frame.style.cssText = 'width:100%;height:100%;border:none;display:block';
+    frame.allow = 'gamepad *; autoplay; fullscreen';
+    holder.appendChild(frame);
+    document.title = `${game.title} — Dimstorted`;
+    return;
+  }
+
+  if (game.runtime !== 'web') {
+    return fail('Console non jouable dans le navigateur',
+      `${game.consoleName} nécessite ${game.emulator || 'un émulateur PC'}. Le lancement natif arrive en V3.`);
+  }
+  if (!game.core) {
+    return fail('Cœur d’émulation manquant', `Aucun cœur n’est associé à ${game.consoleName}.`);
+  }
+
+  msg.hidden = true;
+  document.getElementById('game').hidden = false;
+
+  const discParam = Number(params.get('disc') || 0);
+
+  window.EJS_player = '#game';
+  window.EJS_core = game.core;
+  window.EJS_gameUrl = `/api/rom/${game.id}${discParam ? `?disc=${discParam}` : ''}`;
+  window.EJS_gameName = game.title;
+  window.EJS_pathtodata = emu.path;
+  /*
+   * Qualite d'image.
+   *
+   * Les options du coeur doivent etre posees AVANT le chargement : une fois
+   * l'emulateur demarre, changer la resolution interne demanderait un
+   * redemarrage du rendu.
+   */
+  if (game.video && game.video.coreOptions) {
+    window.EJS_defaultOptions = { ...(window.EJS_defaultOptions || {}), ...game.video.coreOptions };
+  }
+
+  /*
+   * Codes de triche. EmulatorJS construit lui-meme son menu a partir de
+   * `EJS_cheats` — inutile de refaire une interface. Doit etre pose avant le
+   * chargement, et ne doit jamais empecher de jouer s'il echoue.
+   */
+  try {
+    const r = await fetch(`/api/games/${game.id}/cheats`);
+    if (r.ok) {
+      const { cheats } = await r.json();
+      if (Array.isArray(cheats) && cheats.length) window.EJS_cheats = cheats;
+    }
+  } catch {
+    // Sans codes, le jeu se lance normalement
+  }
+
+  window.EJS_startOnLoaded = true;
+  window.EJS_color = '#e50914';
+
+  /*
+   * Coeurs multi-thread (PSP, entre autres).
+   *
+   * Deux conditions doivent etre reunies, et l'absence de l'une comme de
+   * l'autre produit le meme message opaque — « Error for site owner » :
+   *   1. la page doit etre isolee (en-tetes COOP/COEP, envoyes par le serveur)
+   *   2. EJS_threads doit etre explicitement active
+   */
+  if (self.crossOriginIsolated) {
+    window.EJS_threads = true;
+  } else {
+    console.warn('[dimstorted] page non isolée : les cœurs multi-thread (PSP) ne démarreront pas');
+  }
+  // Pas de EJS_language : la traduction francaise n'est pas publiee sur le CDN
+  // EmulatorJS (404 sur fr-FR.json), l'interface reste donc en anglais.
+  // Les sauvegardes d'etat restent dans le navigateur pour la V0 ;
+  // elles passeront cote serveur en V2 avec la fonction « Reprendre ».
+  window.EJS_onGameStart = () => {
+    document.title = `${game.title} — Dimstorted`;
+    applyScaling();
+    applyShader();
+  };
+
+  /**
+   * Shader d'affichage.
+   *
+   * Ne peut etre pose qu'apres le demarrage : il agit sur le pipeline de
+   * rendu, qui n'existe pas avant. Un shader inconnu ou un cœur qui le refuse
+   * ne doit pas empecher de jouer — d'ou le filet.
+   */
+  function applyShader() {
+    const want = game.video && game.video.shader;
+    if (!want || want === 'disabled') return;
+    try {
+      window.EJS_emulator.menuOptionChanged('shader', want);
+    } catch (err) {
+      console.warn('[dimstorted] shader non appliqué :', err.message);
+    }
+  }
+
+  /**
+   * Mise a l'echelle de l'image.
+   *
+   * Une console 2D dessine une grille de pixels. Agrandie avec le lissage du
+   * navigateur, elle devient floue. En rendu « pixelise », chaque pixel reste
+   * net — c'est l'aspect d'origine, en plus grand.
+   *
+   * Le canvas n'existe qu'une fois l'emulateur demarre, et EmulatorJS peut le
+   * recreer : on observe donc le conteneur plutot que d'agir une seule fois.
+   */
+  function applyScaling() {
+    if (!game.video || !game.video.pixelated) return;
+    for (const c of document.querySelectorAll('#game canvas')) {
+      c.style.imageRendering = 'pixelated';
+    }
+  }
+  new MutationObserver(applyScaling)
+    .observe(document.getElementById('game'), { childList: true, subtree: true });
+
+  const script = document.createElement('script');
+  script.src = `${emu.path}loader.js`;
+  script.onerror = () => fail('Moteur d’émulation injoignable',
+    `Impossible de charger EmulatorJS depuis ${emu.path}.`);
+  document.body.appendChild(script);
+
+  /* ------------------------------------------------ Sauvegardes d'état */
+
+  const AUTO_SLOT = 0;
+  const resumeWanted = params.get('resume') === '1';
+  let ready = false;
+  let lastSaved = 0;
+
+  /** L'émulateur est prêt quand son gestionnaire de jeu répond. */
+  function manager() {
+    const gm = window.EJS_emulator?.gameManager;
+    return gm && typeof gm.getState === 'function' ? gm : null;
+  }
+
+  async function waitReady(timeout = 60000) {
+    const started = Date.now();
+    while (Date.now() - started < timeout) {
+      const gm = manager();
+      if (gm) {
+        try { if (gm.supportsStates()) return gm; } catch { /* pas encore prêt */ }
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return null;
+  }
+
+  /**
+   * Capture l'état et l'envoie au serveur.
+   * `beacon` sert à la fermeture brutale de l'onglet : c'est le seul envoi
+   * que le navigateur garantit encore à ce moment-là.
+   */
+  async function saveState(slot = AUTO_SLOT, { beacon = false } = {}) {
+    const gm = manager();
+    if (!gm || !ready) return false;
+
+    let state;
+    try {
+      state = await gm.getState();
+    } catch (err) {
+      console.warn('[dimstorted] état illisible', err);
+      return false;
+    }
+    if (!state || !state.length) return false;
+
+    let shot = null;
+    try { shot = await gm.screenshot(); } catch { /* capture facultative */ }
+
+    const form = new FormData();
+    form.append('state', new Blob([state], { type: 'application/octet-stream' }), 'state.bin');
+    if (shot && shot.length > 64) {
+      form.append('shot', new Blob([shot], { type: 'image/png' }), 'shot.png');
+    }
+
+    const url = `/api/games/${game.id}/saves/${slot}`;
+    if (beacon) {
+      // sendBeacon ne connaît que POST ; le serveur accepte les deux verbes
+      return navigator.sendBeacon(`${url}?beacon=1`, form);
+    }
+    const res = await fetch(url, { method: 'PUT', body: form });
+    if (res.ok) lastSaved = Date.now();
+    return res.ok;
+  }
+
+  async function restoreState(slot = AUTO_SLOT) {
+    const gm = manager();
+    if (!gm) return false;
+
+    let buf;
+    try {
+      const res = await fetch(`/api/games/${game.id}/saves/${slot}`);
+      if (!res.ok) return false;
+      buf = new Uint8Array(await res.arrayBuffer());
+      if (!buf.length) return false;
+    } catch (err) {
+      console.warn('[dimstorted] sauvegarde illisible', err);
+      return false;
+    }
+
+    /*
+     * Le coeur accepte un etat bien apres avoir affiche sa premiere image :
+     * tant que sa table de fonctions n'est pas remplie, loadState leve
+     * « RuntimeError: null function ». Rien ne signale ce moment — pas
+     * d'evenement, pas de drapeau —, et le delai necessaire depend de la
+     * machine : quelques centaines de millisecondes avec une vraie carte
+     * graphique, plusieurs secondes en rendu logiciel.
+     *
+     * On reessaie donc, a intervalle croissant, plutot que de parier sur un
+     * delai fixe qui marcherait ici et pas chez soi.
+     */
+    for (let essai = 0; essai < 10; essai += 1) {
+      try {
+        await gm.loadState(buf);
+        return true;
+      } catch (err) {
+        if (essai === 9) {
+          console.warn('[dimstorted] reprise impossible', err);
+          return false;
+        }
+        await new Promise((r) => setTimeout(r, 300 + essai * 150));
+      }
+    }
+    return false;
+  }
+
+  (async () => {
+    const gm = await waitReady();
+    if (!gm) return;
+    ready = true;
+
+    if (resumeWanted) {
+      // Laisse le jeu démarrer avant d'injecter l'état : certains cœurs
+      // réinitialisent la mémoire pendant les toutes premières trames
+      await new Promise((r) => setTimeout(r, 1200));
+      const done = await restoreState(AUTO_SLOT);
+      parent.postMessage({ type: 'dimstorted:resumed', ok: done }, '*');
+    }
+    /*
+     * Changement de disque. Deux cas :
+     *  - le coeur expose plusieurs disques (fichier .pbp, .m3u...) : on bascule
+     *    a chaud, sans rien recharger ;
+     *  - les disques sont des fichiers separes : le parent recharge le lecteur
+     *    sur l'autre disque, en conservant l'etat de la partie.
+     */
+    let diskCount = 1;
+    try { diskCount = gm.getDiskCount?.() ?? 1; } catch { /* non gere par ce coeur */ }
+
+    parent.postMessage({
+      type: 'dimstorted:ready',
+      nativeDisks: diskCount > 1 ? diskCount : 0,
+      currentDisk: diskCount > 1 ? (gm.getCurrentDisk?.() ?? 0) : 0,
+      disc: discParam,
+    }, '*');
+  })();
+
+  // Le parent demande la sauvegarde avant de fermer le lecteur
+  addEventListener('message', async (e) => {
+    const msg = e.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'dimstorted:save-and-quit') {
+      const ok = await saveState(AUTO_SLOT);
+      parent.postMessage({ type: 'dimstorted:saved', ok }, '*');
+    }
+    if (msg.type === 'dimstorted:save-slot') {
+      const ok = await saveState(msg.slot);
+      parent.postMessage({ type: 'dimstorted:saved-slot', slot: msg.slot, ok }, '*');
+    }
+    if (msg.type === 'dimstorted:load-slot') {
+      const ok = await restoreState(msg.slot);
+      parent.postMessage({ type: 'dimstorted:loaded-slot', slot: msg.slot, ok }, '*');
+    }
+    if (msg.type === 'dimstorted:shot') {
+      // La capture vient de l'emulateur, pas du DOM : elle contient l'image
+      // du jeu seule, sans l'interface autour.
+      let ok = false;
+      try {
+        const png = await manager()?.screenshot();
+        if (png && png.length > 64) {
+          const form = new FormData();
+          form.append('shot', new Blob([png], { type: 'image/png' }), 'shot.png');
+          const r = await fetch(`/api/games/${game.id}/shots`, { method: 'POST', body: form });
+          ok = r.ok;
+        }
+      } catch (err) {
+        console.warn('[dimstorted] capture impossible', err);
+      }
+      parent.postMessage({ type: 'dimstorted:shot-done', ok }, '*');
+    }
+    if (msg.type === 'dimstorted:set-disk') {
+      // Bascule à chaud, quand le cœur gère lui-même plusieurs disques
+      let ok = false;
+      try { manager()?.setCurrentDisk(msg.index); ok = true; } catch { ok = false; }
+      parent.postMessage({ type: 'dimstorted:disk-set', index: msg.index, ok }, '*');
+    }
+  });
+
+  // Pendant une partie le focus est dans cette iframe : les raccourcis ne
+  // remontent pas tout seuls au parent, il faut les lui relayer.
+  addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      parent.postMessage({ type: 'dimstorted:request-save-slot' }, '*');
+    }
+    if (e.key === 'F12' || (e.shiftKey && e.key.toLowerCase() === 's')) {
+      e.preventDefault();
+      parent.postMessage({ type: 'dimstorted:request-shot' }, '*');
+    }
+    if (e.key === 'Escape') {
+      parent.postMessage({ type: 'dimstorted:request-quit' }, '*');
+    }
+  });
+
+  // Filet de sécurité : onglet masqué ou fermé sans passer par « Quitter »
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && Date.now() - lastSaved > 5000) {
+      saveState(AUTO_SLOT);
+    }
+  });
+  addEventListener('pagehide', () => { saveState(AUTO_SLOT, { beacon: true }); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2355 @@
+/* Dimstorted — palette et mise en page calquees sur Netflix */
+
+/*
+ * Jetons de style.
+ *
+ * Le rouge #E50914 est reserve au logo, a l'action principale et aux jauges
+ * de progression — c'est la regle de Netflix, et c'est ce qui lui donne sa
+ * force : partout ailleurs, l'interface s'efface derriere les visuels.
+ */
+:root {
+  --mark: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272.4%27%3E%3Cellipse%20cx%3D%2716%27%20cy%3D%2716%27%20rx%3D%2713%27%20ry%3D%275.4%27%20transform%3D%27rotate%28-8%2016%2016%29%27/%3E%3Cellipse%20cx%3D%2716%27%20cy%3D%2716%27%20rx%3D%2710%27%20ry%3D%274.2%27%20transform%3D%27rotate%2820%2016%2016%29%27/%3E%3Cellipse%20cx%3D%2716%27%20cy%3D%2716%27%20rx%3D%277%27%20ry%3D%273%27%20transform%3D%27rotate%2848%2016%2016%29%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%273%27%20fill%3D%27black%27/%3E%3C/svg%3E");
+  --bg: #141414;          /* fond de page */
+  --surface: #181818;     /* carte au repos */
+  --surface-2: #232323;   /* panneau, modale */
+  --surface-3: #2d2d2d;   /* survol */
+  --red: #e50914;
+  --red-hover: #f6121d;
+  --text: #ffffff;
+  --text-dim: #b3b3b3;
+  --text-faint: #777777;
+  --border: #333333;
+  --nav-h: 68px;
+  --gutter: 4vw;
+
+  /* Echelle d'espacement par pas de 4 px */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  /* Echelle typographique, 13 → 56 px */
+  --t-xs: 12px; --t-sm: 13px; --t-md: 15px; --t-lg: 18px;
+  --t-xl: 24px; --t-2xl: 32px; --t-3xl: 44px; --t-4xl: 56px;
+
+  /* Courbe de sortie : depart franc, arrivee amortie */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  /* Delai avant agrandissement : passer la souris sur une rangee ne doit pas
+     faire gonfler chaque carte au vol */
+  --hover-delay: 0.35s;
+}
+
+/* Compatibilite avec les regles ecrites avant l'introduction des jetons */
+:root { --bg-elevated: var(--surface); --bg-hover: var(--surface-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+* { box-sizing: border-box; }
+
+html { scrollbar-color: #444 var(--bg); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  font-size: 14px;
+  overflow-x: hidden;
+}
+
+button, input { font-family: inherit; }
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------------- Nav */
+
+#nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--nav-h);
+  padding: 0 var(--gutter);
+  padding-top: env(safe-area-inset-top, 0px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 100;
+  transition: background-color .4s;
+}
+
+/*
+ * Voile du bandeau.
+ *
+ * Il flotte sur l'illustration de la banniere, qui peut etre un ciel clair —
+ * un circuit de Daytona, une plage. Le degrade precedent tenait dans la seule
+ * hauteur du bandeau et s'etait deja evanoui a mi-hauteur, la ou se trouve
+ * justement la ligne de liens. Celui-ci deborde largement et reste dense
+ * jusqu'au bas du texte.
+ */
+#nav::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: calc(var(--nav-h) * 2.1);
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .70) 40%,
+    rgba(0, 0, 0, .35) 70%, transparent 100%);
+  pointer-events: none;
+  transition: opacity .4s;
+}
+
+/* Une fois defile, le fond est opaque : le voile n'a plus lieu d'etre. */
+#nav.scrolled { background: var(--bg); }
+#nav.scrolled::before { opacity: 0; }
+
+/* Au-dessus du voile */
+.nav-left, .nav-right {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.logo {
+  font-family: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+  font-size: 30px;
+  letter-spacing: 1px;
+  color: var(--red);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: .3em;
+}
+
+.nav-link {
+  /* Plus clair que le gris d'origine, et ombre portee : c'est ce qui detache
+     le texte quand l'illustration derriere est lumineuse. */
+  color: #e4e4e4;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color .2s;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
+}
+.nav-link:hover { color: var(--text); }
+.nav-link.active { color: var(--text); font-weight: 700; }
+
+.logo { text-shadow: 0 1px 6px rgba(0, 0, 0, .9); }
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, .6);
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+.search .icon { width: 18px; height: 18px; fill: var(--text); flex: 0 0 auto; }
+.search input {
+  background: none;
+  border: none;
+  color: var(--text);
+  outline: none;
+  width: 190px;
+}
+.search input::placeholder { color: var(--text-faint); }
+
+.btn-import {
+  background: var(--red);
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 3px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-import:hover { background: var(--red-hover); }
+
+/* L'espace-temps entraine par une masse en rotation : des orbites de plus en
+   plus inclinees autour d'un noyau. C'est le sens du nom. */
+.logo::before {
+  content: '';
+  flex: 0 0 auto;
+  width: .95em; height: .95em;
+  background: currentColor;
+  -webkit-mask: var(--mark) center / contain no-repeat;
+  mask: var(--mark) center / contain no-repeat;
+}
+
+/* ---------------------------------------------------------------- Compte */
+
+.account { position: relative; flex: 0 0 auto; }
+
+.avatar {
+  width: 32px; height: 32px;
+  border-radius: 4px;
+  border: none;
+  background: linear-gradient(135deg, var(--pc, #e50914), color-mix(in srgb, var(--pc, #e50914) 45%, #000));
+  color: #fff;
+  display: grid; place-items: center;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+}
+.avatar:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* Le menu s'ouvre au survol comme chez Netflix, et au clic pour la manette
+   et le mode TV, ou il n'y a pas de pointeur. */
+.account-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(0, 0, 0, .9);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 3px;
+  padding: var(--s2) 0;
+  z-index: 60;
+  animation: menu-in .18s var(--ease);
+}
+.account-menu::before {
+  content: '';
+  position: absolute;
+  top: -11px; right: 8px;
+  border: 6px solid transparent;
+  border-bottom-color: rgba(255, 255, 255, .5);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s2) var(--s4);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.account-item:hover { color: #fff; text-decoration: underline; }
+.account-item .dot {
+  width: 30px; height: 30px;
+  border-radius: 3px;
+  display: grid; place-items: center;
+  font-weight: 700;
+  color: #fff;
+  flex: 0 0 auto;
+}
+.account-item.current .dot { box-shadow: 0 0 0 2px #fff; }
+.account-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, .15);
+  margin: var(--s2) 0;
+}
+.account-head {
+  padding: 0 var(--s4) var(--s2);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ------------------------------------------------------- Écran de profils */
+
+.profiles-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  animation: veil .3s var(--ease);
+}
+
+.profiles-inner { text-align: center; padding: var(--gutter); }
+
+.profiles-title {
+  font-size: clamp(28px, 3.5vw, 56px);
+  font-weight: 400;
+  color: #fff;
+  margin: 0 0 var(--s7);
+}
+
+.profiles-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(var(--s4), 2vw, var(--s7));
+  list-style: none;
+  margin: 0 0 var(--s7);
+  padding: 0;
+}
+
+.profile-tile {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  gap: var(--s3);
+  justify-items: center;
+  color: var(--text-faint);
+  /* Seules transform/opacity bougent : l'animation reste sur le compositeur */
+  transition: color .2s var(--ease);
+}
+
+.profile-face {
+  width: clamp(84px, 10vw, 160px);
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  font-size: clamp(34px, 4vw, 64px);
+  font-weight: 700;
+  color: #fff;
+  box-shadow: inset 0 0 0 4px transparent;
+  transition: box-shadow .2s var(--ease), transform .2s var(--ease);
+}
+
+.profile-tile:hover .profile-face,
+.profile-tile:focus-visible .profile-face {
+  box-shadow: inset 0 0 0 4px #fff;
+}
+.profile-tile:hover { color: #fff; }
+.profile-tile:focus-visible { outline: none; }
+.profile-tile.current .profile-face { box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .55); }
+
+.profile-name { font-size: clamp(13px, 1.1vw, 18px); }
+
+/* En mode gestion, le clic ouvre la fiche au lieu de changer de profil : le
+   crayon le dit clairement. L'initiale s'efface pour ne pas se superposer. */
+.profile-face { position: relative; }
+.profile-face .pencil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .45);
+  border-radius: 4px;
+}
+.profile-face .pencil svg { width: 34%; fill: #fff; }
+
+.profile-tile.add .profile-face {
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--text-faint);
+  color: var(--text-faint);
+  font-size: clamp(40px, 4.5vw, 72px);
+  font-weight: 300;
+}
+.profile-tile.add:hover .profile-face { box-shadow: inset 0 0 0 2px #fff; color: #fff; }
+
+.profiles-manage,
+.profiles-done {
+  background: none;
+  border: 1px solid var(--text-faint);
+  color: var(--text-faint);
+  padding: 10px 26px;
+  font-size: 14px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.profiles-manage:hover,
+.profiles-done:hover { color: #fff; border-color: #fff; }
+.profiles-done { border-color: #fff; color: #fff; background: var(--red); border-color: var(--red); }
+.profiles-done:hover { background: var(--red-hover); border-color: var(--red-hover); }
+
+/* -------------------------------------------------- Fiche d'un profil */
+
+.panel-narrow { max-width: 460px; }
+
+.profile-form { display: grid; gap: var(--s4); justify-items: stretch; }
+
+.profile-preview {
+  width: 84px; height: 84px;
+  border-radius: 4px;
+  display: grid; place-items: center;
+  font-size: 38px; font-weight: 700; color: #fff;
+  justify-self: center;
+}
+
+.swatch-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: var(--s2);
+}
+
+.swatches { display: flex; gap: var(--s3); flex-wrap: wrap; }
+
+.swatch {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch[aria-pressed="true"] { border-color: #fff; }
+
+.link-btn.danger { color: #e87c7c; }
+.link-btn.danger:hover { color: #ff9c9c; }
+
+/* ------------------------------------------------------------------ Hero */
+
+.hero {
+  position: relative;
+  height: min(80vh, 56vw);
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--gutter);
+  margin-bottom: -6vw;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  z-index: 0;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(77deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.25) 55%, transparent 75%),
+    linear-gradient(180deg, transparent 50%, rgba(20,20,20,.7) 85%, var(--bg) 100%);
+  z-index: 1;
+}
+
+/* ARTFLIX pose son texte sur un panneau sombre translucide plutot que
+   directement sur l'illustration : au-dessus d'une image chargee, le seul
+   degrade de fond ne garde pas toujours le synopsis lisible. */
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 620px;
+  padding: 26px 32px 30px;
+  border-radius: 10px;
+  background: linear-gradient(105deg,
+    rgba(10, 10, 10, .70) 0%, rgba(10, 10, 10, .34) 68%, transparent 100%);
+}
+
+.hero-console {
+  color: var(--red);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 13px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.hero-title {
+  font-family: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+  font-size: clamp(38px, 5.2vw, 82px);
+  line-height: 1;
+  margin: 0 0 14px;
+  letter-spacing: 1px;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, .8);
+}
+
+.hero-meta { color: var(--text-dim); font-size: 15px; margin: 0 0 22px; }
+.hero-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* --------------------------------------------------------------- Boutons */
+
+.btn {
+  border: none;
+  border-radius: 4px;
+  padding: 11px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color .2s, opacity .2s;
+  white-space: nowrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+/* Icones en SVG plutot qu'en caracteres : les glyphes comme ⓘ ne sont pas
+   presents dans toutes les polices systeme et tombent en carre vide. */
+.bi { width: 20px; height: 20px; fill: currentColor; flex: 0 0 auto; }
+
+.btn-play { background: #fff; color: #000; }
+.btn-play:hover { background: rgba(255, 255, 255, .78); }
+.btn-info { background: rgba(109, 109, 110, .7); color: #fff; }
+.btn-info:hover { background: rgba(109, 109, 110, .5); }
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid #555;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+.btn-ghost:hover { border-color: #fff; }
+.btn-round {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  padding: 0;
+  background: rgba(42, 42, 42, .6);
+  border: 2px solid rgba(255, 255, 255, .5);
+  color: #fff;
+  font-size: 20px;
+}
+.btn-round:hover { border-color: #fff; background: rgba(60, 60, 60, .8); }
+.btn-round.on { background: #fff; color: #000; border-color: #fff; }
+
+/* --------------------------------------------------------------- Rangees */
+
+#rows { position: relative; z-index: 3; padding-bottom: 60px; }
+
+/*
+ * Sans bannière — onglets Consoles, Ma liste, résultats de recherche — rien
+ * ne pousse le contenu vers le bas, et la première rangée passait sous la
+ * barre de navigation fixe.
+ */
+#hero[hidden] ~ #rows { padding-top: calc(var(--nav-h) + var(--s5)); }
+
+.row { margin: 0 0 3vw; }
+
+.row-title {
+  font-size: clamp(16px, 1.4vw, 22px);
+  font-weight: 700;
+  margin: 0 0 8px var(--gutter);
+  color: #e5e5e5;
+}
+
+/* La rangée porte les flèches ; le défilement vit dans le conteneur interne. */
+.row-viewport { position: relative; }
+
+.row-scroller {
+  display: flex;
+  gap: var(--s2);
+  /* Marge verticale généreuse : la carte agrandie doit tenir sans être
+     rognée, or un conteneur qui défile horizontalement rogne aussi en haut. */
+  padding: 52px var(--gutter);
+  margin: -52px 0;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  /* Pas de scroll-snap : quand une carte s'agrandit, le navigateur recale la
+     position d'accroche et décale toute la rangée au milieu de l'animation.
+     La pagination se fait par programme, comme chez Netflix. */
+}
+.row-scroller::-webkit-scrollbar { display: none; }
+
+/* Flèches de pagination, révélées au survol de la rangée */
+.row-arrow {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: var(--gutter);
+  min-width: 44px;
+  border: none;
+  background: rgba(0, 0, 0, .55);
+  color: #fff;
+  font-size: var(--t-xl);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .2s var(--ease), background-color .2s;
+  z-index: 15;
+  display: grid;
+  place-items: center;
+}
+.row-viewport:hover .row-arrow { opacity: 1; }
+.row-arrow:hover { background: rgba(0, 0, 0, .8); }
+.row-arrow:focus-visible { opacity: 1; outline: 2px solid #fff; outline-offset: -4px; }
+.row-arrow.prev { left: 0; }
+.row-arrow.next { right: 0; }
+.row-arrow[disabled] { display: none; }
+
+/*
+ * Vignette en portrait : c'est le format des jaquettes de jeu. Un cadre 16/9
+ * obligerait à rogner la boîte et à couper le titre.
+ */
+.card {
+  flex: 0 0 auto;
+  width: clamp(140px, 12vw, 210px);
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--surface);
+  /* Seuls transform et opacity sont animés : tout le reste déclencherait
+     un recalcul de mise en page à chaque image. */
+  transition: transform .3s var(--ease), box-shadow .3s var(--ease);
+  transform-origin: center center;
+  will-change: transform;
+}
+.row-scroller > .card:first-child { transform-origin: left center; }
+.row-scroller > .card:last-child { transform-origin: right center; }
+
+/*
+ * Agrandissement au survol, à la manière de Netflix : la carte visée grossit
+ * et ses voisines s'écartent, au lieu d'être recouvertes.
+ *
+ * Le combinateur `~` ne peut viser que les éléments *suivants*. On décale donc
+ * d'abord toute la rangée vers la gauche, puis on rétablit vers la droite ce
+ * qui suit la carte visée — la soustraction produit l'écartement symétrique.
+ */
+.row-scroller:hover > .card,
+.row-scroller:focus-within > .card { transform: translate3d(-7%, 0, 0); }
+.row-scroller > .card:hover ~ .card,
+.row-scroller > .card:focus-visible ~ .card { transform: translate3d(7%, 0, 0); }
+
+.row-scroller > .card:hover,
+.row-scroller > .card:focus-visible {
+  transform: scale(1.34);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .8);
+  z-index: 12;
+  outline: none;
+  transition-delay: var(--hover-delay);
+}
+/* La première et la dernière ne débordent pas : elles poussent vers l'intérieur */
+.row-scroller > .card:first-child:hover { transform: scale(1.34) translate3d(9%, 0, 0); }
+.row-scroller > .card:last-child:hover { transform: scale(1.34) translate3d(-9%, 0, 0); }
+
+.card:focus-visible { box-shadow: 0 0 0 3px #fff, 0 16px 40px rgba(0, 0, 0, .8); }
+
+/*
+ * Fond : la jaquette elle-même, agrandie et floutée. Elle remplit la vignette
+ * et prolonge les couleurs de la boîte, au lieu des bandes noires qu'un
+ * simple « contain » laisserait.
+ */
+.card-blur {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(16px) brightness(.55) saturate(1.2);
+  /* Débordement volontaire : le flou dilue les bords, le zoom les masque */
+  transform: scale(1.18);
+}
+
+/* Premier plan : la jaquette entière, jamais rognée. */
+.card-art {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: transform .2s var(--ease);
+}
+
+/*
+ * Au survol, la jaquette recule pour libérer le bas de la vignette.
+ * Sans cela, le panneau d'aperçu masquerait le titre imprimé sur la boîte —
+ * c'est-à-dire l'information qu'on vient chercher. Un `scale` plutôt qu'un
+ * changement de taille : aucune mise en page n'est recalculée.
+ */
+.card:hover .card-art,
+.card:focus-visible .card-art {
+  transform: translateY(-11%) scale(.78);
+  transition-delay: var(--hover-delay);
+}
+.card-art.card-noart {
+  background-size: cover;
+  display: grid;
+  place-items: center;
+  padding: var(--s3);
+  text-align: center;
+}
+
+/* Captures d'epoque agrandies : gros pixels nets plutot qu'un lissage flou.
+   Ne concerne que la bannière : les jaquettes sont en haute définition. */
+.hero-bg.retro { image-rendering: pixelated; }
+
+.card-art span {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: .5px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .7);
+}
+
+.card-badge {
+  position: absolute;
+  top: 8px; left: 8px;
+  background: rgba(0, 0, 0, .72);
+  border-radius: 3px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+
+.card-native {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(229, 9, 20, .9);
+  border-radius: 3px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.card-resume {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 5px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .9));
+  border-bottom: 3px solid var(--red);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+
+/*
+ * Panneau d'aperçu, révélé seulement quand la carte est agrandie.
+ * Il occupe le bas de la carte plutôt que d'en augmenter la hauteur : faire
+ * grandir la boîte relancerait la mise en page de toute la rangée.
+ */
+.card-hover {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: var(--s2);
+  /* Fond opaque : la jaquette s'est retirée, le panneau occupe sa propre zone */
+  background: #0c0c0c;
+  border-radius: 0 0 4px 4px;
+  opacity: 0;
+  transition: opacity .2s var(--ease);
+}
+.card:hover .card-hover,
+.card:focus-visible .card-hover {
+  opacity: 1;
+  transition-delay: var(--hover-delay);
+}
+.card-hover b {
+  display: block;
+  font-size: 11px;
+  line-height: 1.2;
+  margin-bottom: 2px;
+  /* Un titre long ne doit pas repousser les boutons hors de la carte */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-hover small { color: var(--text-dim); font-size: 9px; display: block; }
+
+.card-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.card:hover .card-actions {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--hover-delay) + .08s);
+}
+.card-act {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .55);
+  background: rgba(20, 20, 20, .75);
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color .15s, border-color .15s;
+}
+.card-act:hover { background: #fff; color: #000; border-color: #fff; }
+.card-act.primary { background: #fff; color: #000; border-color: #fff; }
+.card-act.primary:hover { background: rgba(255, 255, 255, .78); }
+
+/* Le contenu du panneau est dimensionné dans le repère non agrandi : on
+   compense l'échelle pour qu'il reste lisible une fois la carte grossie. */
+
+/* ------------------------------------------------------ Rangée classée */
+
+/*
+ * Le chiffre se place À CÔTÉ de la vignette, pas dessus : c'est ce qui rend
+ * la rangée « Top 10 » lisible chez Netflix. La carte est donc élargie, et
+ * son visuel décalé vers la droite pour laisser la place au numéro.
+ */
+.row-ranked .card { width: clamp(230px, 20vw, 340px); }
+.row-ranked .card-art,
+.row-ranked .card-blur,
+.row-ranked .card-hover { left: 42%; }
+.row-ranked .card-badge,
+.row-ranked .card-excl { left: calc(42% + 8px); }
+
+.card-rank {
+  position: absolute;
+  left: 0; bottom: -10px;
+  width: 40%;
+  text-align: center;
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: clamp(96px, 9vw, 150px);
+  line-height: .78;
+  /* Chiffre évidé : massif sans écraser le visuel */
+  color: var(--bg);
+  -webkit-text-stroke: 3px #6d6d6e;
+  text-stroke: 3px #6d6d6e;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ------------------------------------------------ Ossature de chargement */
+
+.skeleton .sk-hero {
+  height: min(62vh, 44vw);
+  min-height: 320px;
+  margin-bottom: var(--s6);
+  background: linear-gradient(100deg, #1a1a1a 30%, #242424 50%, #1a1a1a 70%);
+  background-size: 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton .sk-title {
+  width: 220px; height: 22px;
+  margin: 0 0 var(--s3) var(--gutter);
+  border-radius: 4px;
+  background: #1f1f1f;
+}
+.skeleton .sk-card {
+  flex: 0 0 auto;
+  width: clamp(140px, 12vw, 210px);
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  background: linear-gradient(100deg, #1a1a1a 30%, #242424 50%, #1a1a1a 70%);
+  background-size: 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton .row-scroller { overflow: hidden; }
+
+@keyframes shimmer {
+  from { background-position: 140% 0; }
+  to   { background-position: -40% 0; }
+}
+
+/* ------------------------------------------------------------ Etat vide */
+
+.empty {
+  text-align: center;
+  padding: 24vh var(--gutter) 10vh;
+}
+.empty h2 {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 46px; letter-spacing: 1px; margin: 0 0 10px;
+}
+.empty p { color: var(--text-dim); margin: 0 0 22px; }
+.empty-hint { font-size: 13px; color: var(--text-faint); margin-top: 26px !important; }
+.empty code {
+  background: #222; padding: 3px 8px; border-radius: 3px; color: #ddd;
+  word-break: break-all;
+}
+
+/* ------------------------------------------------------------- Overlays */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .78);
+  z-index: 200;
+  overflow-y: auto;
+  padding: 60px 16px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #181818;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 5;
+}
+.close:hover { background: #333; }
+
+.import-panel, .detail-panel {
+  position: relative;
+  width: min(900px, 100%);
+  background: var(--surface-2);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+}
+
+/*
+ * La fiche se déploie depuis la vignette cliquée. Les variables sont posées
+ * en JavaScript à partir de la position réelle de la carte : le panneau part
+ * de là où l'œil était, plutôt que d'apparaître d'un bloc au centre.
+ */
+.overlay { animation: veil .25s var(--ease); }
+@keyframes veil { from { background: rgba(0, 0, 0, 0); } }
+
+.detail-panel { animation: bloom .34s var(--ease); transform-origin: var(--from-x, 50%) var(--from-y, 40%); }
+@keyframes bloom {
+  from { opacity: .4; transform: scale(.72) translateY(26px); }
+  to   { opacity: 1;  transform: none; }
+}
+.import-panel, .fixer-panel, .confirm-panel {
+  animation: rise .28s var(--ease);
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------- Panneau de gestion */
+
+/*
+ * Netflix ne montre jamais un mur de formulaires, même dans ses réglages de
+ * compte : une tâche par écran, des lignes espacées, et les champs de saisie
+ * n'apparaissent qu'au moment de modifier quelque chose.
+ */
+.manage-panel {
+  position: relative;
+  width: min(860px, 100%);
+  background: var(--surface-2);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+  animation: rise .28s var(--ease);
+}
+
+.manage-head {
+  padding: var(--s6) var(--s6) 0;
+  border-bottom: 1px solid var(--border);
+}
+.manage-head h2 {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: var(--t-3xl);
+  letter-spacing: 1px;
+  margin: 0 0 var(--s5);
+}
+
+.manage-tabs { display: flex; gap: var(--s6); }
+.mtab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: var(--t-md);
+  padding: 0 0 var(--s3);
+  cursor: pointer;
+  transition: color .2s;
+}
+.mtab:hover { color: var(--text); }
+.mtab.on { color: var(--text); border-bottom-color: var(--red); font-weight: 600; }
+
+.manage-body { padding: var(--s6); }
+.manage-intro {
+  color: var(--text-dim);
+  font-size: var(--t-sm);
+  line-height: 1.6;
+  margin: 0 0 var(--s5);
+}
+
+/* Ligne de réglage : intitulé à gauche, action à droite, filet de séparation */
+.srow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s5);
+  padding: var(--s5) 0;
+  border-bottom: 1px solid var(--border);
+}
+.srow:last-child { border-bottom: none; }
+.srow-main { flex: 1; min-width: 0; }
+.srow-main b { display: block; font-size: var(--t-md); margin-bottom: var(--s1); }
+.srow-main small {
+  display: block;
+  color: var(--text-dim);
+  font-size: var(--t-sm);
+  line-height: 1.55;
+}
+.srow-act {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: 0 0 auto;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin: var(--s7) 0 var(--s3);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--border);
+}
+.section-head h3 { margin: 0; font-size: var(--t-lg); }
+
+.pill {
+  display: inline-block;
+  background: var(--red);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: var(--t-xs);
+  margin-left: var(--s1);
+  vertical-align: middle;
+}
+
+.dz-alt {
+  color: var(--text-dim);
+  font-size: var(--t-sm);
+  margin: var(--s4) 0 0;
+  line-height: 1.6;
+}
+.dz-alt code {
+  background: #141414;
+  padding: 2px 7px;
+  border-radius: 3px;
+  color: #ddd;
+  word-break: break-all;
+}
+
+.region-chips { display: flex; gap: var(--s1); flex-wrap: wrap; margin-top: var(--s3); }
+.region-chip {
+  background: #141414;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3px 11px;
+  font-size: var(--t-xs);
+  color: var(--text-dim);
+}
+.region-chip:first-child { border-color: var(--red); color: #fff; }
+
+/* ------------------------------------------------------------ Dropzone */
+
+.dropzone {
+  border: 2px dashed #444;
+  border-radius: 8px;
+  padding: 36px 20px;
+  text-align: center;
+  transition: border-color .2s, background-color .2s;
+}
+.dropzone.drag { border-color: var(--red); background: rgba(229, 9, 20, .07); }
+.dz-icon { font-size: 34px; color: var(--text-faint); }
+.dz-title { font-size: 18px; font-weight: 700; margin: 10px 0 4px; }
+.dz-sub { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; }
+
+.dz-progress { margin-top: 18px; }
+.dz-bar {
+  height: 4px; border-radius: 2px; background: var(--red);
+  width: 0; transition: width .2s;
+}
+.dz-progress span { display: block; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+
+.scan-row { display: flex; gap: 10px; margin: 18px 0 26px; }
+.scan-row input {
+  flex: 1;
+  background: #333;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 4px;
+  outline: none;
+  min-width: 0;
+}
+.scan-row input:focus { border-color: #888; }
+
+/* ---------------------------------------------------------------- File */
+
+.queue-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.queue-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  background: var(--red); border-radius: 10px;
+  padding: 1px 8px; font-size: 12px; margin-left: 6px;
+}
+
+.q-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: #202020;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.q-main { min-width: 0; }
+.q-file { font-size: 12px; color: var(--text-faint); word-break: break-all; }
+.q-fields { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.q-fields input, .q-fields select {
+  background: #333; border: 1px solid #444; color: #fff;
+  padding: 7px 9px; border-radius: 4px; outline: none;
+}
+.q-fields input { flex: 1; min-width: 160px; }
+.q-reason { font-size: 12px; margin-top: 7px; }
+.q-actions { display: flex; flex-direction: column; gap: 6px; }
+
+.conf { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.conf-high { background: #1a7f37; }
+.conf-medium { background: #9a6700; }
+.conf-low { background: #7d2a2a; }
+
+/* --------------------------------------------------------------- Fiche */
+
+.detail-panel { overflow: hidden; }
+
+/* La fiche reprend la construction de la banniere : illustration, voile,
+   texte. L'image est isolee dans sa propre couche pour pouvoir deriver sans
+   entrainer le voile — un degrade qui bouge se voit immediatement. */
+.detail-art {
+  height: 340px;
+  position: relative;
+  overflow: hidden;
+}
+.detail-art-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  animation: derive-lente 24s ease-out forwards;
+  will-change: transform;
+}
+.detail-voile {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(100deg, rgba(24,24,24,.92) 0%, rgba(24,24,24,.55) 38%,
+                    rgba(24,24,24,.08) 70%, transparent 90%),
+    linear-gradient(to top, var(--bg-elevated) 0%, rgba(24,24,24,.6) 22%,
+                    transparent 55%);
+}
+
+.detail-body { padding: 0 34px 34px; margin-top: -84px; position: relative; z-index: 2; }
+
+/* La machine, montree plutot qu'ecrite. Voir marqueConsole() cote script. */
+.detail-console {
+  color: var(--text-dim);
+  font-size: 13px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.detail-console.avec-logo {
+  width: min(170px, 26vw);
+  height: 38px;
+  background: left center / contain no-repeat;
+  text-indent: -9999px;          /* le nom reste lisible par les lecteurs d'ecran */
+  overflow: hidden;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, .9));
+}
+
+.detail-title {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 52px; line-height: 1.02; letter-spacing: 1px; margin: 0 0 16px;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, .75);
+}
+.detail-actions { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+.detail-meta { color: var(--text-dim); font-size: 14px; margin-bottom: 14px; }
+.detail-meta span { margin-right: 12px; }
+/* Meme ponctuation que la banniere : les informations se lisent en une ligne */
+.detail-meta span:not(:last-child)::after {
+  content: "\00b7";
+  margin-left: 12px;
+  color: var(--text-faint);
+}
+.detail-meta b { color: #46d369; font-weight: 700; }
+.detail-desc { color: #d2d2d2; line-height: 1.5; }
+.detail-native {
+  margin-top: 18px; padding: 14px;
+  background: rgba(229, 9, 20, .12);
+  border-left: 3px solid var(--red);
+  border-radius: 4px;
+  font-size: 13px; color: #e8e8e8;
+}
+
+/* ------------------------------------------------ Jaquettes et scraping */
+
+.hero-desc {
+  color: #d6d6d6;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 22px;
+  max-width: 560px;
+  /* Un synopsis peut être long : on le borne pour ne pas noyer les boutons */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .8);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+/* Sans jaquette, la colonne de gauche disparait : sans cette regle le texte
+   se retrouve place dans la colonne de 170px et se casse mot a mot. */
+.detail-grid.no-poster { grid-template-columns: 1fr; }
+.detail-poster {
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  /* Les jaquettes n'ont pas toutes le meme format : boitier PS1 presque
+     carre, boite carton NES allongee. On affiche l'image entiere plutot
+     que de la recadrer et d'amputer le titre. */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #0e0e0e;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .7);
+}
+.detail-info { min-width: 0; }
+.detail-credits {
+  color: var(--text-faint);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+.detail-scrape { margin-top: 20px; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.link-btn:hover { color: var(--text-dim); }
+
+.scrape-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, .06);
+  border-left: 3px solid #9a6700;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #e2e2e2;
+}
+
+.scrape-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.scrape-info { color: var(--text-dim); font-size: 13px; margin: 10px 0 0; }
+
+#scrape-progress { margin-top: 14px; }
+.scrape-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #333;
+  overflow: hidden;
+}
+.scrape-bar { height: 100%; width: 0; background: var(--red); transition: width .3s; }
+.scrape-label { display: block; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+
+/* ---------------------------------------------------------- Mode TV */
+
+/* Lu depuis un canapé : tout grandit, et le focus doit sauter aux yeux. */
+body.tv {
+  font-size: 17px;
+}
+body.tv .row-title { font-size: clamp(22px, 2vw, 32px); }
+body.tv .card { width: clamp(190px, 16vw, 280px); }
+body.tv .card-hover b { font-size: 15px; }
+body.tv .card-hover small { font-size: 13px; }
+body.tv .hero-title { font-size: clamp(52px, 6.5vw, 104px); }
+body.tv .hero-meta, body.tv .hero-desc { font-size: 19px; }
+body.tv .btn { padding: 15px 32px; font-size: 19px; }
+body.tv .detail-title { font-size: 54px; }
+body.tv .detail-meta, body.tv .detail-desc { font-size: 17px; }
+body.tv .search, body.tv .btn-import { display: none; }
+/* La barre d'aide couvre le bas de l'ecran : la derniere rangee doit pouvoir
+   remonter au-dessus, sinon elle reste inatteignable a la manette. */
+body.tv { padding-bottom: 76px; }
+
+/* Le survol à la souris ne veut rien dire sur une télé : c'est le focus
+   qui doit porter l'agrandissement et le cadre. */
+body.tv .card:focus-visible,
+body.tv .card:focus {
+  transform: scale(1.14);
+  box-shadow: 0 0 0 4px var(--red), 0 14px 34px rgba(0, 0, 0, .8);
+  z-index: 10;
+}
+body.tv .card:focus .card-hover { opacity: 1; }
+
+/* ------------------------------------------------------------ Commandes */
+
+.ctrl-consoles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.ctrl-console {
+  background: #262626;
+  border: 1px solid #444;
+  color: var(--text-dim);
+  padding: 7px 13px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ctrl-console:hover { border-color: #777; color: var(--text); }
+.ctrl-console.on { background: var(--red); border-color: var(--red); color: #fff; }
+/* Console sans jeu : configurable, mais visuellement en retrait */
+.ctrl-console.empty { opacity: .55; }
+.ctrl-console.empty.on { opacity: 1; }
+
+.ctrl-hint { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
+
+.ctrl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 22px;
+}
+.ctrl-key {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #222;
+  border: 2px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}
+.ctrl-key:hover { border-color: #777; }
+.ctrl-key.dir { background: #1d2130; }
+.ctrl-key.listening {
+  border-color: var(--red);
+  background: rgba(229, 9, 20, .15);
+}
+.ctrl-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .6px; }
+.ctrl-value { font-size: 15px; font-weight: 700; }
+
+/* --------------------------------------------------- Émulateurs natifs */
+
+.emu-item .conf { vertical-align: middle; margin-left: var(--s2); }
+.emu-item a { color: #6ea8fe; }
+.emu-path {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--t-xs);
+  color: var(--text-faint);
+  word-break: break-all;
+}
+.emu-edit { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.emu-warn {
+  font-size: 12px;
+  color: #ffd257;
+  background: rgba(154, 103, 0, .18);
+  border-left: 3px solid #9a6700;
+  padding: 8px 10px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+}
+.emu-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+.emu-input {
+  flex: 1;
+  min-width: 220px;
+  background: #333;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 4px;
+  outline: none;
+  font-size: 13px;
+}
+.emu-input:focus { border-color: #888; }
+
+.native-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* -------------------------------------------------- Sauvegardes d'état */
+
+.detail-saves { margin: 0 0 18px; }
+.save-list { display: flex; gap: 10px; flex-wrap: wrap; }
+.save-item {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #444;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1d1d1d;
+}
+.save-item:hover { border-color: #777; }
+.save-load {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+  width: 132px;
+}
+.save-load img, .save-noshot {
+  width: 116px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #0d0d0d;
+  /* Les captures sortent de l'émulateur en résolution d'époque */
+  image-rendering: pixelated;
+}
+.save-noshot { display: grid; place-items: center; color: var(--text-faint); }
+.save-load span { font-size: 12px; font-weight: 600; }
+.save-load small { color: var(--text-faint); font-size: 11px; }
+.save-drop {
+  background: none;
+  border: none;
+  border-left: 1px solid #444;
+  color: var(--text-faint);
+  padding: 0 9px;
+  cursor: pointer;
+}
+.save-drop:hover { background: var(--red); color: #fff; }
+
+/* ------------------------------------------------- Éditions régionales */
+
+.card-excl {
+  position: absolute;
+  bottom: 8px; left: 8px;
+  background: rgba(0, 0, 0, .78);
+  border: 1px solid #b8860b;
+  color: #ffd257;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+.card-multi {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  background: rgba(0, 0, 0, .72);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.detail-editions { margin: 0 0 16px; }
+.ed-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+.ed-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.ed-item {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #444;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #222;
+}
+.ed-item.on { border-color: var(--red); background: rgba(229, 9, 20, .14); }
+.ed-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ed-pick small { color: var(--text-faint); font-size: 11px; }
+.ed-flag { font-size: 15px; }
+.ed-drop {
+  background: none;
+  border: none;
+  border-left: 1px solid #444;
+  color: var(--text-faint);
+  padding: 0 10px;
+  cursor: pointer;
+}
+.ed-drop:hover { background: var(--red); color: #fff; }
+
+.region-pref { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.region-pref label { font-size: 12px; color: var(--text-dim); }
+.region-pref input {
+  background: #333; border: 1px solid #444; color: #fff;
+  padding: 7px 10px; border-radius: 4px; outline: none; min-width: 240px;
+}
+
+.dup-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  background: #202020;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.dup-item small { color: var(--text-faint); margin-left: 8px; font-size: 12px; }
+.dup-regions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dup-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #333;
+  color: var(--text-dim);
+}
+.dup-chip.on { background: var(--red); color: #fff; }
+
+.rejected-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, .05);
+  border-left: 3px solid #9a6700;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.rejected-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------ Édition manuelle */
+
+.scrape-note-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.detail-scrape .link-btn + .link-btn { margin-left: 16px; }
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.edit-grid label, .edit-full {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.edit-full { margin-bottom: 16px; }
+.edit-grid input, .edit-full textarea {
+  background: #333;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 9px 11px;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+  resize: vertical;
+}
+.edit-grid input:focus, .edit-full textarea:focus { border-color: #888; }
+
+.edit-cover {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.edit-cover small { color: var(--text-faint); }
+
+/* -------------------------------------------------------- Confirmation */
+
+.confirm-panel {
+  position: relative;
+  width: min(460px, 100%);
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 26px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+  height: fit-content;
+  margin-top: 12vh;
+}
+.confirm-text { margin: 0 0 16px; line-height: 1.5; }
+.confirm-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 22px;
+  cursor: pointer;
+}
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* --------------------------------------------------- Correcteur jaquette */
+
+.fixer-panel {
+  position: relative;
+  width: min(760px, 100%);
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+}
+.fixer-panel h2 {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 30px; letter-spacing: 1px; margin: 0 0 4px;
+}
+.fixer-game { color: var(--text-dim); margin: 0 0 16px; font-size: 14px; }
+.fixer-hint { color: var(--text-faint); font-size: 13px; }
+
+#fixer-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.fixer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #222;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}
+.fixer-item:hover { border-color: var(--red); }
+.fixer-item:disabled { opacity: .4; cursor: wait; }
+.fixer-item img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  background: #111;
+  border-radius: 4px;
+}
+.fixer-item span { font-size: 12px; line-height: 1.3; word-break: break-word; }
+.fixer-item small { color: var(--text-faint); font-size: 11px; }
+
+/* ------------------------------------------------------------- Lecteur */
+
+.player {
+  position: fixed; inset: 0; z-index: 300;
+  background: #000;
+  display: flex; flex-direction: column;
+}
+.player-bar {
+  height: 46px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+  display: flex; align-items: center; justify-content: space-between;
+  background: #0b0b0b;
+  border-bottom: 1px solid #222;
+  flex: 0 0 auto;
+}
+.player-title { font-weight: 700; font-size: 14px; }
+.player-tools { display: flex; align-items: center; gap: 12px; }
+.player-hint { color: var(--text-faint); font-size: 12px; }
+
+.player-discs { display: inline-flex; align-items: center; gap: 4px; }
+.pd-label {
+  color: var(--text-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-right: 4px;
+}
+.pd-btn {
+  background: #222;
+  border: 1px solid #444;
+  color: var(--text-dim);
+  width: 28px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.pd-btn:hover { border-color: #888; color: #fff; }
+.pd-btn.on { background: var(--red); border-color: var(--red); color: #fff; }
+#player-frame { flex: 1; width: 100%; border: none; background: #000; }
+
+/* ------------------------------------------------------------- Palette */
+
+.palette {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0, 0, 0, .6);
+  display: flex; justify-content: center;
+  padding-top: 14vh;
+}
+.palette-box {
+  width: min(620px, 92vw);
+  background: #1c1c1c;
+  border: 1px solid #383838;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .85);
+  height: fit-content;
+}
+#palette-input {
+  width: 100%;
+  background: none; border: none; outline: none;
+  color: #fff; font-size: 18px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #333;
+}
+#palette-results { max-height: 46vh; overflow-y: auto; }
+.p-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px; cursor: pointer;
+}
+.p-item.sel { background: var(--red); }
+.p-item small { color: var(--text-dim); margin-left: auto; }
+.p-item.sel small { color: rgba(255, 255, 255, .85); }
+.p-empty { padding: 18px 20px; color: var(--text-faint); }
+
+/* --------------------------------------------------------------- Toast */
+
+.toast {
+  position: fixed;
+  left: 50%; bottom: 32px;
+  transform: translateX(-50%);
+  background: #232323;
+  border: 1px solid #3a3a3a;
+  border-left: 3px solid var(--red);
+  padding: 12px 18px;
+  border-radius: 5px;
+  z-index: 500;
+  max-width: min(520px, 92vw);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+
+/* ------------------------------------------------------------ Responsive */
+
+@media (max-width: 860px) {
+  :root { --gutter: 16px; }
+  .nav-link, .search input { display: none; }
+  .hero { min-height: 340px; margin-bottom: 0; }
+  .import-panel { padding: 20px; }
+  .detail-body { padding: 0 20px 24px; }
+  .q-item { grid-template-columns: 1fr; }
+  .q-actions { flex-direction: row; }
+}
+
+/* ------------------------------------------------------- Rendu de l'image */
+
+.vid-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s4) 0;
+  margin-bottom: var(--s4);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.vid-row b { display: block; font-size: var(--t-md); margin-bottom: 2px; }
+.vid-row small { color: var(--text-dim); font-size: var(--t-sm); }
+.vid-select {
+  background: #333;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 4px;
+  outline: none;
+  font-size: var(--t-sm);
+  min-width: 190px;
+}
+.vid-select:focus { border-color: #888; }
+
+/* ------------------------------------------------------------- Filtres */
+
+.filters {
+  position: relative;
+  z-index: 4;
+  padding: calc(var(--nav-h) + var(--s5)) var(--gutter) 0;
+}
+.filters-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.f-sel {
+  background: #191919;
+  border: 1px solid #454545;
+  color: var(--text);
+  padding: 8px 11px;
+  border-radius: 4px;
+  outline: none;
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.f-sel:hover { border-color: #888; }
+/* Un filtre actif se repère d'un coup d'œil dans la barre */
+.f-sel.on { border-color: var(--red); color: #fff; }
+.f-count { color: var(--text-dim); font-size: var(--t-sm); margin-left: auto; }
+
+/* Résultats : une grille, pas une rangée qui défile — on parcourt, on ne
+   feuillette pas. */
+.grid-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--s5) var(--s2);
+  padding: var(--s5) var(--gutter) var(--s8);
+}
+.grid-results .card { width: 100%; }
+/* Dans une grille, l'agrandissement au survol recouvrirait les voisines :
+   on se contente d'un léger relief. */
+.grid-results .card:hover,
+.grid-results .card:focus-visible { transform: scale(1.06); }
+.grid-results .card:hover .card-art { transform: translateY(-11%) scale(.78); }
+
+/* ------------------------------------------------------- Bouton hasard */
+
+.btn-random {
+  background: transparent;
+  border: 1px solid #555;
+  color: var(--text);
+  width: 36px; height: 34px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: border-color .2s, transform .2s var(--ease);
+}
+.btn-random:hover { border-color: #fff; transform: rotate(-12deg); }
+
+/* --------------------------------------------------------- Statistiques */
+
+.stat-top {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s3);
+  margin-bottom: var(--s5);
+}
+.stat-tile {
+  background: #1c1c1c;
+  border-radius: 6px;
+  padding: var(--s4);
+}
+.stat-tile b {
+  display: block;
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: var(--t-2xl);
+  line-height: 1.1;
+  letter-spacing: .5px;
+}
+.stat-tile small {
+  display: block;
+  color: var(--text-faint);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin-top: 2px;
+}
+
+.stat-list { margin-top: var(--s5); }
+.stat-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: var(--t-sm);
+}
+.stat-line:last-child { border-bottom: none; }
+.stat-line .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-line .val { color: var(--text-dim); flex: 0 0 auto; }
+/* Jauge de repartition : le rouge est reserve aux barres de progression */
+.stat-bar {
+  flex: 0 0 34%;
+  height: 6px;
+  border-radius: 3px;
+  background: #2a2a2a;
+  overflow: hidden;
+}
+.stat-bar i { display: block; height: 100%; background: var(--red); }
+
+/* ------------------------------------------------------ Captures d'écran */
+
+.detail-shots { margin: 0 0 18px; }
+.shot-n {
+  background: #333;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: var(--t-xs);
+  margin-left: var(--s1);
+}
+.shot-strip {
+  display: flex;
+  gap: var(--s2);
+  overflow-x: auto;
+  padding-bottom: var(--s1);
+  scrollbar-width: none;
+}
+.shot-strip::-webkit-scrollbar { display: none; }
+.shot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 148px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+.shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  /* Captures d'époque : gros pixels nets plutôt qu'un lissage */
+  image-rendering: pixelated;
+}
+.shot-acts {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .85));
+  opacity: 0;
+  transition: opacity .2s var(--ease);
+}
+.shot:hover .shot-acts { opacity: 1; }
+.shot-acts button {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(20, 20, 20, .8);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.shot-acts button:hover { background: #fff; color: #000; border-color: #fff; }
+
+/* ==================================================== Grille des consoles
+   Reprise du theme Alekfull-ARTFLIX : l'illustration de la machine en fond,
+   son logo detoure par-dessus, un voile sombre entre les deux pour que le
+   texte reste lisible. Les valeurs d'animation viennent de ses storyboards —
+   scale 1 -> 1.05 en easeOut sur 1000 ms pour le logo, un lent zoom sur le
+   fond. Rien ici n'est calcule : ce sont des transformations, donc le
+   compositeur s'en charge seul. */
+
+.grille-consoles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--s4);
+  padding: calc(var(--nav-h) + var(--s6)) var(--gutter) var(--s8);
+}
+
+.tuile-console {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border: none;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  background: #000;
+  transition: transform .3s var(--ease), box-shadow .3s var(--ease);
+}
+.tuile-console:hover,
+.tuile-console:focus-visible {
+  transform: scale(1.04);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .7);
+  outline: none;
+  z-index: 2;
+}
+
+.tc-art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  /* Le lent panoramique du theme : scale 1 -> 1.2, mais seulement au survol,
+     pour ne pas faire bouger douze tuiles en permanence. */
+  transition: transform 8s linear;
+}
+.tuile-console:hover .tc-art { transform: scale(1.14); }
+
+.tc-voile {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.35) 45%, rgba(0,0,0,.15) 100%);
+}
+
+.tc-logo {
+  position: absolute;
+  left: 8%; right: 8%;
+  top: 50%;
+  height: 34%;
+  transform: translateY(-58%);
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, .8));
+  transition: transform 1s var(--ease);
+}
+.tuile-console:hover .tc-logo { transform: translateY(-58%) scale(1.05); }
+
+.tc-bas {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: var(--s3) var(--s4);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.tc-nom {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 20px;
+  letter-spacing: .04em;
+  color: #fff;
+}
+.tc-nb { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+
+/* -------------------------------------------- Banniere d'une console ouverte */
+
+.entete-console {
+  position: relative;
+  min-height: 34vh;
+  background-size: cover;
+  background-position: center 35%;
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: var(--s5);
+}
+.ec-voile {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--bg) 2%, rgba(20,20,20,.55) 50%, rgba(20,20,20,.75) 100%);
+}
+.ec-contenu {
+  position: relative;
+  padding: calc(var(--nav-h) + var(--s5)) var(--gutter) var(--s5);
+  width: 100%;
+}
+.ec-retour {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 0 var(--s4);
+}
+.ec-retour:hover { color: #fff; text-decoration: underline; }
+.ec-logo {
+  width: min(360px, 46vw);
+  height: 84px;
+  background: left center / contain no-repeat;
+  filter: drop-shadow(0 3px 12px rgba(0, 0, 0, .8));
+}
+.ec-nb { color: var(--text-dim); font-size: 14px; margin: var(--s3) 0 0; }
+
+.grille-jeux {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s4);
+  padding: 0 var(--gutter) var(--s8);
+}
+/* En grille, la carte ne pousse pas ses voisines : elle grandit sur place */
+.grille-jeux .card:hover { transform: scale(1.08); z-index: 3; }
+
+/* ------------------------------------------- Mouvement de la banniere
+   Le storyboard d'ARTFLIX anime son fond : scale 1 -> 1.2 sur 15 s, avec une
+   legere derive horizontale. C'est ce qui empeche une image fixe de paraitre
+   morte. On reste plus sobre — 1.10 sur 24 s — parce que la banniere est vue
+   a chaque ouverture, pas seulement en passant. */
+
+@keyframes derive-lente {
+  from { transform: scale(1)    translate3d(0, 0, 0); }
+  to   { transform: scale(1.10) translate3d(-1.5%, -1%, 0); }
+}
+
+.hero-bg {
+  animation: derive-lente 24s ease-out forwards;
+  will-change: transform;
+}
+
+/* Une personne qui a demande moins d'animations ne doit pas subir celle-ci */
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg, .detail-art-bg { animation: none; }
+  .tc-art, .tc-logo { transition: none; }
+}
+
+/* ==================================================== Banniere en trois couches
+   L'illustration en plein cadre, un voile sombre, puis le texte.
+   Le voile du theme (overlay1222.png) a ete ecarte : c'est le decor complet
+   de leur interface, logo ARTFLIX compris, et il portait des bords francs
+   dessines pour une mise en page fixe. Deux degrades croises font le meme
+   travail — assombrir a gauche pour le texte, en bas pour la jonction avec
+   les rangees — sans importer la marque de quelqu'un d'autre. */
+
+.hero-voile {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(100deg, rgba(20,20,20,.96) 0%, rgba(20,20,20,.72) 32%,
+                    rgba(20,20,20,.15) 62%, transparent 85%),
+    linear-gradient(to top, var(--bg) 0%, rgba(20,20,20,.55) 18%, transparent 46%),
+    /* Le bord droit accueille la colonne de vedettes : sur une illustration
+       claire, des logos blancs y disparaitraient. On s'arrete tot — les
+       illustrations de LaunchBox placent leur personnage a droite, et
+       l'eteindre reviendrait a se priver de ce qu'on est alle chercher. */
+    linear-gradient(to left, rgba(20,20,20,.78) 0%, transparent 26%);
+}
+
+/* Le logo de la machine, a la place de son nom ecrit */
+.hero-console.avec-logo {
+  width: min(230px, 30vw);
+  height: 52px;
+  background: left center / contain no-repeat;
+  text-indent: -9999px;          /* le nom reste lisible par les lecteurs d'ecran */
+  overflow: hidden;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, .9));
+  margin-bottom: var(--s3);
+}
+
+/* -------------------------------------------- Survol : la capture apparait
+   ARTFLIX lance une video du jeu au survol. On n'a pas de video, mais on a
+   la capture de gameplay pour 99 % du catalogue : elle se substitue a la
+   jaquette en fondu. Le geste est le meme, l'effet aussi. */
+
+.card-snap {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity .45s var(--ease);
+  transition-delay: var(--hover-delay);
+}
+.card:hover .card-snap { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-snap { transition: none; }
+}
+
+/* ==================================================== Effets cathodiques
+   ARTFLIX propose de voiler toute l'interface d'un rendu televiseur. Ce ne
+   sont pas des shaders : de simples textures carrelees, que le theme pose en
+   surimpression. On les reprend telles quelles.
+
+   En option, jamais par defaut : c'est spectaculaire dix minutes et fatigant
+   au bout d'une heure, et chacun ne le supporte pas pareil. */
+
+body[data-fx]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;      /* l'effet ne doit jamais gener un clic */
+  mix-blend-mode: multiply;
+}
+
+body[data-fx="crt"]::after {
+  background: url('/theme/fx/crt.png') repeat;
+  opacity: .55;
+}
+body[data-fx="scanlines"]::after {
+  background: url('/theme/fx/scanlines.png') repeat;
+  opacity: .45;
+}
+body[data-fx="phosphore"]::after {
+  background: url('/theme/fx/phosphore.png') repeat;
+  opacity: .5;
+}
+
+/* Le leger vignettage d'un tube : les bords d'un ecran cathodique
+   s'assombrissent, c'est ce detail qui rend l'illusion credible. */
+body[data-fx]:not([data-fx="aucun"])::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 55%, rgba(0, 0, 0, .35) 100%);
+}
+
+/* ==================================================== Barre d'aide du mode TV
+   ARTFLIX garde en pied d'ecran le rappel de ce que fait chaque bouton. A
+   trois metres d'une television, sans clavier ni souris, c'est la seule
+   documentation disponible — et elle doit rester exacte : chaque ligne
+   correspond a une action reellement branchee dans padTick().
+
+   Les couleurs sont celles des manettes Xbox et Nintendo, que presque tout le
+   monde reconnait sans avoir a lire la lettre. */
+
+.aide-tv {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 16px 44px;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, .94) 0%, rgba(0, 0, 0, .6) 62%, transparent 100%);
+  font-size: 15px;
+  color: #cfcfcf;
+  pointer-events: none;    /* une aide ne se clique pas */
+}
+
+.aide-item { display: inline-flex; align-items: center; gap: 9px; }
+
+.glyphe {
+  display: inline-grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #2a2a2a;
+  border: 1px solid #4a4a4a;
+  font: 700 12px/1 system-ui, sans-serif;
+  color: #fff;
+}
+.gl-a { background: #2e7d32; border-color: #4caf50; }
+.gl-b { background: #b71c1c; border-color: #e53935; }
+.gl-x { background: #1565c0; border-color: #42a5f5; }
+.gl-y { background: #f9a825; border-color: #fdd835; color: #1a1a1a; }
+
+.aide-heure {
+  margin-left: auto;
+  font-family: "Bebas Neue", Impact, sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+/* ==================================================== Note du public
+   Quatre etoiles sous le synopsis, comme ARTFLIX. La source est la note
+   communautaire de LaunchBox, sur cinq. */
+
+.etoiles {
+  color: #f5c518;
+  letter-spacing: 3px;
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+.etoiles .vide { color: rgba(255, 255, 255, .22); }
+.etoiles small {
+  color: var(--text-faint);
+  letter-spacing: 0;
+  margin-left: 10px;
+  font-size: 12px;
+}
+
+/* ==================================================== Le titre montre, pas ecrit
+   Le lettrage de Shenmue, celui de Metal Gear, celui de Sonic : on les
+   reconnait avant de les lire. C'est ce qui donne a ARTFLIX son air de
+   jaquette plutot que de tableur. Le texte reste dans l'element, renvoye
+   hors cadre, pour les lecteurs d'ecran et pour les jeux sans logo connu. */
+
+.hero-title.avec-logo,
+.detail-title.avec-logo {
+  background: left bottom / contain no-repeat;
+  text-indent: -9999px;
+  overflow: hidden;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, .9));
+}
+.hero-title.avec-logo {
+  width: min(540px, 46vw);
+  height: clamp(96px, 12vw, 172px);
+}
+.detail-title.avec-logo {
+  width: min(430px, 42vw);
+  height: 100px;
+}
+
+/* ==================================================== La colonne de vedettes
+   ARTFLIX fait defiler sur la droite la liste des jeux, chacun montre par son
+   logo. On y met les autres candidats a la banniere : cliquer change la
+   vedette sans quitter la page. */
+
+.hero-pile {
+  position: absolute;
+  top: 50%;
+  right: clamp(16px, 3vw, 56px);
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: clamp(150px, 15vw, 230px);
+}
+
+.hp-item {
+  height: 56px;
+  padding: 0;
+  border: none;
+  background: transparent center / contain no-repeat;
+  color: #bdbdbd;
+  font: 600 14px/1.2 system-ui, sans-serif;
+  text-align: right;
+  cursor: pointer;
+  opacity: .5;
+  /* Permanente, pas seulement sur la vedette : certaines illustrations sont
+     claires d'un bout a l'autre, et un logo blanc s'y dissoudrait. */
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, .95));
+  transition: opacity .25s var(--ease), transform .25s var(--ease);
+}
+.hp-item.avec-logo { background-position: right center; }
+/* Quand le logo est la, le nom sort du cadre sans quitter le document : les
+   lecteurs d'ecran continuent de l'annoncer. */
+.hp-item.avec-logo .hp-nom {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.hp-item:hover,
+.hp-item:focus-visible { opacity: .85; transform: translateX(-6px); outline: none; }
+.hp-item.actif { opacity: 1; transform: translateX(-10px); }
+
+/* Sous 900 px la colonne mordrait sur le texte : elle disparait. */
+@media (max-width: 900px) { .hero-pile { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hp-item { transition: none; } }
+
+/* ==================================================== Teinte de l'interface
+   ARTFLIX propose cinq couleurs pour sa vue principale. On ne touche qu'a
+   l'accent — le logo, les boutons, le lisere de focus. Le fond reste noir :
+   c'est lui qui fait tenir les jaquettes, et l'eclaircir ruinerait l'image.
+
+   Comme l'effet cathodique, le reglage appartient a l'appareil et non au
+   profil : on n'a pas le meme gout sur un telephone et sur un televiseur. */
+
+body[data-teinte="bleu"]   { --red: #1f6feb; --red-hover: #3b82f6; }
+body[data-teinte="vert"]   { --red: #1a9e4b; --red-hover: #22c55e; }
+body[data-teinte="orange"] { --red: #e07a00; --red-hover: #f59e0b; }
+body[data-teinte="violet"] { --red: #7c3aed; --red-hover: #8b5cf6; }
